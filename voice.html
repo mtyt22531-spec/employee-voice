@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>🎙️ الإدخال الصوتي</title>
+
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      padding: 20px;
+
+      background:
+        linear-gradient(
+          135deg,
+          #eaf7f1,
+          #f8fbf9
+        );
+
+      font-family:
+        Arial,
+        Tahoma,
+        sans-serif;
+
+      color: #26332e;
+    }
+
+    .card {
+
+      width: 100%;
+      max-width: 430px;
+
+      background: white;
+
+      border-radius: 24px;
+
+      padding: 28px;
+
+      text-align: center;
+
+      box-shadow:
+        0 10px 35px
+        rgba(0,0,0,.12);
+    }
+
+    .mic {
+
+      width: 95px;
+      height: 95px;
+
+      margin: 5px auto 18px;
+
+      border-radius: 50%;
+
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      background: #e8f5f0;
+
+      color: #087f5b;
+
+      font-size: 45px;
+
+      transition: .25s;
+    }
+
+    .mic.listening {
+
+      background: #ffe3e3;
+
+      color: #c92a2a;
+
+      animation:
+        pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+
+      50% {
+        transform: scale(1.08);
+      }
+
+    }
+
+    h2 {
+
+      margin:
+        0 0 8px;
+
+      color: #087f5b;
+
+      font-size: 21px;
+    }
+
+    .field-name {
+
+      font-size: 13px;
+
+      color: #718078;
+
+      margin-bottom: 18px;
+    }
+
+    .status {
+
+      min-height: 24px;
+
+      font-size: 13px;
+
+      color: #45534d;
+
+      margin-bottom: 18px;
+    }
+
+    .result {
+
+      width: 100%;
+
+      min-height: 100px;
+
+      border:
+        1px solid #d6e2dc;
+
+      border-radius: 13px;
+
+      padding: 13px;
+
+      background: #fbfdfc;
+
+      font-size: 15px;
+
+      line-height: 1.8;
+
+      margin-bottom: 18px;
+
+      text-align: right;
+    }
+
+    .buttons {
+
+      display: grid;
+
+      grid-template-columns:
+        1fr 1fr;
+
+      gap: 10px;
+    }
+
+    button {
+
+      border: 0;
+
+      border-radius: 12px;
+
+      padding: 13px;
+
+      font-size: 14px;
+
+      font-weight: bold;
+
+      cursor: pointer;
+    }
+
+    .start {
+
+      background:
+        linear-gradient(
+          135deg,
+          #087f5b,
+          #099268
+        );
+
+      color: white;
+    }
+
+    .cancel {
+
+      background: #f1f3f5;
+
+      color: #495057;
+    }
+
+    .send {
+
+      grid-column: 1 / -1;
+
+      background: #e8f5f0;
+
+      color: #087f5b;
+    }
+
+    button:disabled {
+
+      opacity: .45;
+
+      cursor: not-allowed;
+    }
+
+    .hint {
+
+      margin-top: 16px;
+
+      font-size: 11px;
+
+      line-height: 1.7;
+
+      color: #868e96;
+    }
+
+  </style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+  <div
+    id="mic"
+    class="mic"
+  >
+    🎙️
+  </div>
+
+  <h2>
+    الإدخال الصوتي
+  </h2>
+
+  <div
+    id="fieldName"
+    class="field-name"
+  >
+    جاري التحضير...
+  </div>
+
+  <div
+    id="status"
+    class="status"
+  >
+    اضغط "بدء التسجيل" وتحدث بالعربية.
+  </div>
+
+  <textarea
+    id="result"
+    class="result"
+    placeholder="النص الذي سيتم التعرف عليه سيظهر هنا..."
+  ></textarea>
+
+  <div class="buttons">
+
+    <button
+      id="startBtn"
+      class="start"
+      onclick="startRecognition()"
+    >
+      🎙️ بدء التسجيل
+    </button>
+
+    <button
+      class="cancel"
+      onclick="closeWindow()"
+    >
+      ✖ إلغاء
+    </button>
+
+    <button
+      id="sendBtn"
+      class="send"
+      onclick="sendResult()"
+      disabled
+    >
+      ✅ إدخال النص في الحقل
+    </button>
+
+  </div>
+
+  <div class="hint">
+
+    سيتم استخدام الميكروفون الموجود في جهازك.
+    <br>
+    تحدث بوضوح ثم اضغط إدخال النص.
+
+  </div>
+
+</div>
+
+<script>
+
+const params =
+  new URLSearchParams(
+    window.location.search
+  );
+
+const fieldId =
+  params.get('field') || '';
+
+const fieldLabel =
+  params.get('label') || 'الحقل';
+
+const existingText =
+  params.get('text') || '';
+
+
+document.getElementById(
+  'fieldName'
+).textContent =
+  'الحقل: ' + fieldLabel;
+
+
+document.getElementById(
+  'result'
+).value =
+  '';
+
+
+/****************************************************
+ * التعرف الصوتي
+ ****************************************************/
+
+let recognition = null;
+
+let finalText = '';
+
+let listening = false;
+
+
+function startRecognition() {
+
+  const SpeechRecognition =
+    window.SpeechRecognition ||
+    window.webkitSpeechRecognition;
+
+
+  if (!SpeechRecognition) {
+
+    setStatus(
+      'هذا المتصفح لا يدعم التعرف الصوتي. استخدم Google Chrome.'
+    );
+
+    return;
+
+  }
+
+
+  if (listening) {
+
+    stopRecognition();
+
+    return;
+
+  }
+
+
+  finalText = '';
+
+  document.getElementById(
+    'result'
+  ).value = '';
+
+
+  recognition =
+    new SpeechRecognition();
+
+
+  recognition.lang =
+    'ar-EG';
+
+
+  recognition.continuous =
+    false;
+
+
+  recognition.interimResults =
+    true;
+
+
+  recognition.maxAlternatives =
+    1;
+
+
+  recognition.onstart =
+    function() {
+
+      listening = true;
+
+      document.getElementById(
+        'mic'
+      ).classList.add(
+        'listening'
+      );
+
+      document.getElementById(
+        'startBtn'
+      ).textContent =
+        '⏹️ إيقاف التسجيل';
+
+      document.getElementById(
+        'sendBtn'
+      ).disabled =
+        true;
+
+      setStatus(
+        '🎙️ أستمع إليك الآن... تحدث.'
+      );
+
+    };
+
+
+  recognition.onresult =
+    function(event) {
+
+      let text = '';
+
+
+      for (
+        let i = event.resultIndex;
+        i < event.results.length;
+        i++
+      ) {
+
+        text +=
+          event.results[i][0]
+            .transcript;
+
+      }
+
+
+      document.getElementById(
+        'result'
+      ).value =
+        text;
+
+
+      finalText =
+        text;
+
+
+      if (text.trim()) {
+
+        document.getElementById(
+          'sendBtn'
+        ).disabled =
+          false;
+
+      }
+
+    };
+
+
+  recognition.onerror =
+    function(event) {
+
+      console.log(
+        'Voice error:',
+        event.error
+      );
+
+
+      listening = false;
+
+
+      resetUI();
+
+
+      if (
+        event.error ===
+        'not-allowed'
+      ) {
+
+        setStatus(
+          '❌ لم يتم السماح باستخدام الميكروفون.'
+        );
+
+        alert(
+          'لم يتم السماح باستخدام الميكروفون.\n\n' +
+          'اضغط على علامة القفل 🔒 بجوار عنوان الصفحة، ' +
+          'واجعل الميكروفون = السماح، ثم أعد المحاولة.'
+        );
+
+        return;
+
+      }
+
+
+      if (
+        event.error ===
+        'no-speech'
+      ) {
+
+        setStatus(
+          'لم يتم التقاط كلام. اضغط بدء التسجيل وتحدث مرة أخرى.'
+        );
+
+        return;
+
+      }
+
+
+      if (
+        event.error ===
+        'audio-capture'
+      ) {
+
+        setStatus(
+          '❌ لم يتم العثور على ميكروفون.'
+        );
+
+        return;
+
+      }
+
+
+      if (
+        event.error !==
+        'aborted'
+      ) {
+
+        setStatus(
+          'حدث خطأ أثناء التعرف الصوتي.'
+        );
+
+      }
+
+    };
+
+
+  recognition.onend =
+    function() {
+
+      listening = false;
+
+      resetUI();
+
+
+      if (finalText.trim()) {
+
+        setStatus(
+          '✅ تم التعرف على الكلام. راجع النص ثم اضغط إدخال النص.'
+        );
+
+      } else {
+
+        setStatus(
+          'لم يتم التقاط نص.'
+        );
+
+      }
+
+    };
+
+
+  try {
+
+    recognition.start();
+
+  } catch (error) {
+
+    console.log(error);
+
+    resetUI();
+
+    setStatus(
+      'تعذر بدء التسجيل. حاول مرة أخرى.'
+    );
+
+  }
+
+}
+
+
+/****************************************************
+ * إيقاف التسجيل
+ ****************************************************/
+
+function stopRecognition() {
+
+  if (!recognition) {
+    return;
+  }
+
+
+  try {
+
+    recognition.stop();
+
+  } catch (e) {}
+
+}
+
+
+/****************************************************
+ * إرسال النص إلى EmployeeForm
+ ****************************************************/
+
+function sendResult() {
+
+  const text =
+    document.getElementById(
+      'result'
+    ).value.trim();
+
+
+  if (!text) {
+
+    alert(
+      'لم يتم التعرف على أي كلام.'
+    );
+
+    return;
+
+  }
+
+
+  if (
+    window.opener &&
+    !window.opener.closed
+  ) {
+
+    window.opener.postMessage(
+      {
+        type:
+          'EMPLOYEE_VOICE_RESULT',
+
+        fieldId:
+          fieldId,
+
+        text:
+          text
+      },
+
+      '*'
+    );
+
+
+    setStatus(
+      '✅ تم إرسال النص إلى نموذج الموظف.'
+    );
+
+
+    setTimeout(
+      function() {
+
+        window.close();
+
+      },
+      500
+    );
+
+
+    return;
+
+  }
+
+
+  /*
+   * احتياطي لو لم تكن الصفحة
+   * مفتوحة من نموذج الموظف.
+   */
+
+  navigator.clipboard
+    .writeText(text)
+    .then(
+      function() {
+
+        alert(
+          'تم نسخ النص إلى الحافظة.'
+        );
+
+      }
+    )
+    .catch(
+      function() {
+
+        alert(
+          'النص:\n\n' +
+          text
+        );
+
+      }
+    );
+
+}
+
+
+/****************************************************
+ * إغلاق
+ ****************************************************/
+
+function closeWindow() {
+
+  if (listening) {
+
+    stopRecognition();
+
+  }
+
+
+  window.close();
+
+}
+
+
+/****************************************************
+ * واجهة المستخدم
+ ****************************************************/
+
+function resetUI() {
+
+  document.getElementById(
+    'mic'
+  ).classList.remove(
+    'listening'
+  );
+
+
+  document.getElementById(
+    'startBtn'
+  ).textContent =
+    '🎙️ بدء التسجيل';
+
+
+  document.getElementById(
+    'sendBtn'
+  ).disabled =
+    !document.getElementById(
+      'result'
+    ).value.trim();
+
+}
+
+
+function setStatus(text) {
+
+  document.getElementById(
+    'status'
+  ).textContent =
+    text;
+
+}
+
+</script>
+
+</body>
+
+</html>
